@@ -83,11 +83,26 @@ const KEYS_SUBDIR = path.join(RUNTIME_CERT_DIR, "keys");
 if (!fs.existsSync(CERTS_SUBDIR)) fs.mkdirSync(CERTS_SUBDIR, { recursive: true });
 if (!fs.existsSync(KEYS_SUBDIR)) fs.mkdirSync(KEYS_SUBDIR, { recursive: true });
 
+const forge = require("node-forge");
 const targetCaPem = path.join(CERTS_SUBDIR, "ca.pem");
 const targetCaKey = path.join(KEYS_SUBDIR, "ca.private.key");
+const targetCaPublicKey = path.join(KEYS_SUBDIR, "ca.public.key");
 
 const caCertContent = fs.readFileSync(CA_CERT, "utf8");
 const caKeyContent = fs.readFileSync(CA_KEY, "utf8");
+
+try {
+    const privateKey = forge.pki.privateKeyFromPem(caKeyContent);
+    const publicKey = forge.pki.setRsaPublicKey(privateKey.n, privateKey.e);
+    const publicPem = forge.pki.publicKeyToPem(publicKey);
+    fs.writeFileSync(targetCaPublicKey, publicPem);
+} catch (e) {
+    // If forge fails to derive, try reading ca.crt
+    try {
+        const certObj = forge.pki.certificateFromPem(caCertContent);
+        fs.writeFileSync(targetCaPublicKey, forge.pki.publicKeyToPem(certObj.publicKey));
+    } catch (_) {}
+}
 
 fs.writeFileSync(targetCaPem, caCertContent);
 fs.writeFileSync(targetCaKey, caKeyContent);
@@ -1219,9 +1234,13 @@ proxy.listen({
     sslCaKey: fs.readFileSync(
         CA_KEY
     )
-});
+}, (err) => {
+    if (err) {
+        console.error("[PROXY FATAL ERROR] Failed to start proxy server:", err);
+        process.exit(1);
+    }
 
-console.log(`
+    console.log(`
 ================================================================
            Network Web Filter Proxy (Running)
               Developed by Divyansh Yadav
@@ -1234,3 +1253,4 @@ console.log(`
 
 ================================================================
 `);
+});
