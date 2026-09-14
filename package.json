@@ -1,0 +1,20 @@
+{
+  "name": "skonexa-proxy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/proxy.js",
+  "scripts": {
+    "start": "node src/proxy.js",
+    "build:exe": "node scripts/build_exe.js",
+    "build:msi": "node scripts/build_msi.js",
+    "build:all": "node scripts/build_exe.js && node scripts/build_msi.js",
+    "verify:msi": "node scripts/verify_msi.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "http-mitm-proxy": "^1.1.0"
+  }
+}

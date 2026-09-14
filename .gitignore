@@ -1,0 +1,30 @@
+# Dependencies & External Source References
+node_modules/
+uBlock-master/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build and Staging Artifacts
+build_staging/
+cab_temp/
+app_payload.zip
+makecab.ddf
+setup.inf
+setup.rpt
+file_list.json
+generate_msi.ps1
+*.log
+
+# Generated Dynamic Domain Certificates (keep CA certs)
+certs/certs/*.pem
+!certs/certs/ca.pem
+certs/keys/*.key
+!certs/keys/ca.private.key
+
+# OS and Editor Files
+.DS_Store
+Thumbs.db
+*.tmp
+.vscode/
+.idea/
