@@ -55,6 +55,7 @@ if (fs.existsSync(path.join(__dirname, "config.js"))) {
     config = require("../config");
 }
 
+const os = require("os");
 const CERT_DIR = fs.existsSync(path.join(__dirname, "certs", "ca.crt"))
     ? path.join(__dirname, "certs")
     : path.join(__dirname, "..", "certs");
@@ -72,9 +73,13 @@ if (!fs.existsSync(CA_KEY)) {
     process.exit(1);
 }
 
-// Ensure http-mitm-proxy CA store uses the specified ca.crt and ca.key
-const CERTS_SUBDIR = path.join(CERT_DIR, "certs");
-const KEYS_SUBDIR = path.join(CERT_DIR, "keys");
+// Enable Wildcard certificate generation (*.domain.com) to minimize certificate overhead
+proxy.use(Proxy.wildcard);
+
+// Store ephemeral domain certificates in OS Temp directory to keep project folders clean
+const RUNTIME_CERT_DIR = path.join(os.tmpdir(), "NetworkProxy_Certs");
+const CERTS_SUBDIR = path.join(RUNTIME_CERT_DIR, "certs");
+const KEYS_SUBDIR = path.join(RUNTIME_CERT_DIR, "keys");
 if (!fs.existsSync(CERTS_SUBDIR)) fs.mkdirSync(CERTS_SUBDIR, { recursive: true });
 if (!fs.existsSync(KEYS_SUBDIR)) fs.mkdirSync(KEYS_SUBDIR, { recursive: true });
 
@@ -84,22 +89,8 @@ const targetCaKey = path.join(KEYS_SUBDIR, "ca.private.key");
 const caCertContent = fs.readFileSync(CA_CERT, "utf8");
 const caKeyContent = fs.readFileSync(CA_KEY, "utf8");
 
-if (!fs.existsSync(targetCaPem) || fs.readFileSync(targetCaPem, "utf8").trim() !== caCertContent.trim()) {
-    fs.writeFileSync(targetCaPem, caCertContent);
-    fs.writeFileSync(targetCaKey, caKeyContent);
-
-    // Clear old domain certificates generated with previous CA
-    for (const f of fs.readdirSync(CERTS_SUBDIR)) {
-        if (f !== "ca.pem" && f.endsWith(".pem")) {
-            try { fs.unlinkSync(path.join(CERTS_SUBDIR, f)); } catch (_) {}
-        }
-    }
-    for (const f of fs.readdirSync(KEYS_SUBDIR)) {
-        if (f !== "ca.private.key" && f !== "ca.public.key" && f.endsWith(".key")) {
-            try { fs.unlinkSync(path.join(KEYS_SUBDIR, f)); } catch (_) {}
-        }
-    }
-}
+fs.writeFileSync(targetCaPem, caCertContent);
+fs.writeFileSync(targetCaKey, caKeyContent);
 
 /*
 |--------------------------------------------------------------------------
@@ -1219,7 +1210,7 @@ proxy.listen({
     port: config.port,
     host: config.host || "0.0.0.0",
 
-    sslCaDir: CERT_DIR,
+    sslCaDir: RUNTIME_CERT_DIR,
 
     sslCaCert: fs.readFileSync(
         CA_CERT
