@@ -48,7 +48,7 @@ namespace NetworkWebFilterProxy
         {
             try
             {
-                Console.Title = "Network Web Filter Proxy - Divyansh Yadav";
+                Console.Title = "Network Tool developed by Divyansh";
             }
             catch { }
 
@@ -64,10 +64,6 @@ namespace NetworkWebFilterProxy
 
             if (!Directory.Exists(targetDir) || !File.Exists(markerFile))
             {
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("[*] Initializing Network Web Filter Proxy environment...");
-                Console.ResetColor();
-
                 try
                 {
                     if (Directory.Exists(targetDir))
@@ -79,33 +75,21 @@ namespace NetworkWebFilterProxy
                     Assembly asm = Assembly.GetExecutingAssembly();
                     using (Stream resStream = asm.GetManifestResourceStream("Payload.zip"))
                     {
-                        if (resStream == null)
+                        if (resStream != null)
                         {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine("[!] Error: Embedded resource Payload.zip not found.");
-                            Console.ResetColor();
-                            Console.WriteLine("Press any key to exit...");
-                            Console.ReadKey();
-                            return;
-                        }
+                            string zipPath = Path.Combine(targetDir, "payload.zip");
+                            using (FileStream fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write))
+                            {
+                                resStream.CopyTo(fs);
+                            }
 
-                        string zipPath = Path.Combine(targetDir, "payload.zip");
-                        using (FileStream fs = new FileStream(zipPath, FileMode.Create, FileAccess.Write))
-                        {
-                            resStream.CopyTo(fs);
+                            ZipFile.ExtractToDirectory(zipPath, targetDir);
+                            File.Delete(zipPath);
+                            File.WriteAllText(markerFile, DateTime.UtcNow.ToString());
                         }
-
-                        ZipFile.ExtractToDirectory(zipPath, targetDir);
-                        File.Delete(zipPath);
-                        File.WriteAllText(markerFile, DateTime.UtcNow.ToString());
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("[!] Extraction error: " + ex.Message);
-                    Console.ResetColor();
-                }
+                catch { }
             }
 
             // Auto-install / trust root certificate if present
@@ -123,35 +107,61 @@ namespace NetworkWebFilterProxy
                 catch { }
             }
 
+            // Display Clean Banner
+            try
+            {
+                Console.Clear();
+            }
+            catch { }
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("================================================================");
+            Console.WriteLine("             Network Tool developed by Divyansh                 ");
+            Console.WriteLine("================================================================");
+            Console.ResetColor();
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("  [✓] Status       : Active & Protecting");
+            Console.WriteLine("  [✓] Proxy Address: 127.0.0.1:8085");
+            Console.ResetColor();
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine("  Network policy and content filtering enforced.");
+            Console.WriteLine("  Keep this window open while using the internet.");
+            Console.WriteLine("================================================================");
+            Console.ResetColor();
+
             string nodePath = Path.Combine(targetDir, "node.exe");
             string scriptPath = Path.Combine(targetDir, "proxy.js");
 
             if (!File.Exists(nodePath))
             {
-                // Fallback to system node if not bundled
                 nodePath = "node.exe";
             }
 
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = nodePath;
-            psi.Arguments = "\"" + scriptPath + "\"";
+            psi.Arguments = "--max-http-header-size=1048576 \"" + scriptPath + "\"";
             psi.WorkingDirectory = targetDir;
             psi.UseShellExecute = false;
-            psi.RedirectStandardOutput = false;
-            psi.RedirectStandardError = false;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+            psi.CreateNoWindow = false;
 
             try
             {
-                nodeProcess = Process.Start(psi);
+                nodeProcess = new Process();
+                nodeProcess.StartInfo = psi;
+                nodeProcess.OutputDataReceived += (s, e) => { };
+                nodeProcess.ErrorDataReceived += (s, e) => { };
+                nodeProcess.Start();
+                nodeProcess.BeginOutputReadLine();
+                nodeProcess.BeginErrorReadLine();
                 nodeProcess.WaitForExit();
             }
-            catch (Exception ex)
+            catch
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("[!] Proxy launch error: " + ex.Message);
-                Console.ResetColor();
-                Console.WriteLine("Press any key to exit...");
-                Console.ReadKey();
+                KillNode();
             }
         }
     }

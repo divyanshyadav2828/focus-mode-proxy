@@ -26,7 +26,7 @@ The project provides both a **portable single-file executable (`.exe`)** requiri
   - Dismisses anti-adblock dialogs and bypasses YouTube ad enforcement seamlessly.
 
 - 🔒 **Granular URL Path & Domain Filtering**:
-  - Configurable domain allowlists and blocklists via [`config.js`](file:///c:/Users/IS/Desktop/VIDYAGYAN_PORTALS/skonexa-proxy/config.js).
+  - Configurable domain allowlists and blocklists via [`config.js`](config.js).
   - Exact URL path blocking (e.g., blocking `https://sites.google.com/view/drive-u-7-home/home` while allowing the rest of `sites.google.com`).
 
 - 🎨 **Custom 403 "Access Restricted" Page**:
@@ -48,7 +48,7 @@ The project provides both a **portable single-file executable (`.exe`)** requiri
 ## 📁 Repository Structure
 
 ```
-skonexa-proxy/
+network-webfilter-proxy/
 ├── certs/                      # Root CA certificate & keys
 │   ├── ca.crt                  # Public Root CA certificate
 │   ├── ca.key                  # Root CA private key
@@ -84,7 +84,7 @@ skonexa-proxy/
 1. Clone the repository and install dependencies:
    ```bash
    git clone <repo-url>
-   cd skonexa-proxy
+   cd network-webfilter-proxy
    npm install
    ```
 
@@ -98,7 +98,7 @@ skonexa-proxy/
    - **Port**: `8085`
 
 4. Install the Root Certificate:
-   - Double-click [`certs/ca.crt`](file:///c:/Users/IS/Desktop/VIDYAGYAN_PORTALS/skonexa-proxy/certs/ca.crt) and install it into **Trusted Root Certification Authorities**.
+   - Double-click [`certs/ca.crt`](certs/ca.crt) and install it into **Trusted Root Certification Authorities**.
 
 ---
 
@@ -115,7 +115,7 @@ skonexa-proxy/
 
 ## ⚙️ Configuration
 
-Edit [`config.js`](file:///c:/Users/IS/Desktop/VIDYAGYAN_PORTALS/skonexa-proxy/config.js) to customize proxy behavior:
+Edit [`config.js`](config.js) to customize proxy behavior:
 
 ```javascript
 module.exports = {

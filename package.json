@@ -1,10 +1,11 @@
 {
-  "name": "skonexa-proxy",
+  "name": "network-webfilter-proxy",
   "version": "1.0.0",
   "description": "",
   "main": "src/proxy.js",
   "scripts": {
-    "start": "node src/proxy.js",
+    "start": "node --max-http-header-size=1048576 src/proxy.js",
+    "build": "node scripts/build_exe.js",
     "build:exe": "node scripts/build_exe.js",
     "build:msi": "node scripts/build_msi.js",
     "build:all": "node scripts/build_exe.js && node scripts/build_msi.js",

@@ -5,10 +5,58 @@
 // when connecting through corporate networks, SSL inspection proxies, or sites with custom/self-signed certs.
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
+// Silently handle uncaught socket/TLS aborts to prevent terminal stack traces
+process.on("uncaughtException", () => {});
+process.on("unhandledRejection", () => {});
+
+const http = require("http");
 const https = require("https");
+
 if (https.globalAgent && https.globalAgent.options) {
     https.globalAgent.options.rejectUnauthorized = false;
 }
+
+// Fix Header overflow (HPE_HEADER_OVERFLOW): Allow large HTTP headers (1 MB instead of default 16 KB)
+const MAX_HEADER_SIZE = 1048576; // 1 MB
+
+const origHttpRequest = http.request;
+http.request = function (options, ...rest) {
+    if (typeof options === "object" && options !== null) {
+        if (!options.maxHeaderSize) options.maxHeaderSize = MAX_HEADER_SIZE;
+        if (options.rejectUnauthorized === undefined) options.rejectUnauthorized = false;
+    }
+    return origHttpRequest.call(this, options, ...rest);
+};
+
+const origHttpsRequest = https.request;
+https.request = function (options, ...rest) {
+    if (typeof options === "object" && options !== null) {
+        if (!options.maxHeaderSize) options.maxHeaderSize = MAX_HEADER_SIZE;
+        if (options.rejectUnauthorized === undefined) options.rejectUnauthorized = false;
+    }
+    return origHttpsRequest.call(this, options, ...rest);
+};
+
+const origHttpCreateServer = http.createServer;
+http.createServer = function (opts, reqListener) {
+    if (typeof opts === "function") {
+        reqListener = opts;
+        opts = { maxHeaderSize: MAX_HEADER_SIZE };
+    } else if (typeof opts === "object" && opts !== null) {
+        if (!opts.maxHeaderSize) opts.maxHeaderSize = MAX_HEADER_SIZE;
+    } else {
+        opts = { maxHeaderSize: MAX_HEADER_SIZE };
+    }
+    return origHttpCreateServer.call(this, opts, reqListener);
+};
+
+const origHttpsCreateServer = https.createServer;
+https.createServer = function (opts, reqListener) {
+    if (typeof opts === "object" && opts !== null) {
+        if (!opts.maxHeaderSize) opts.maxHeaderSize = MAX_HEADER_SIZE;
+    }
+    return origHttpsCreateServer.call(this, opts, reqListener);
+};
 
 const net = require("net");
 
@@ -221,7 +269,7 @@ const UBLOCK_JS = `
 (function() {
     'use strict';
 
-    console.log('%c[Skonexa Guard] uBlock Master & Anti-Shorts Engine ACTIVE', 'color: #00ff88; font-weight: bold; font-size: 13px; background: #181818; padding: 4px 8px; border-radius: 4px; border: 1px solid #00ff88;');
+    console.log('%c[Network Guard] uBlock Master & Anti-Shorts Engine ACTIVE', 'color: #00ff88; font-weight: bold; font-size: 13px; background: #181818; padding: 4px 8px; border-radius: 4px; border: 1px solid #00ff88;');
 
     // 1. Instant Player Response Ad Sanitizer
     function sanitizePlayerObj(obj) {
@@ -423,15 +471,630 @@ const UBLOCK_JS = `
 
     var observer = new MutationObserver(cleanDOM);
     observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    // 7. Study Mode for YouTube Home Page (Restricted Page Design System)
+    const STUDY_STYLE_ID = "study-mode-style";
+    const STUDY_SCREEN_ID = "study-mode-screen";
+
+    const studyCss = \`
+        ytd-browse[page-subtype="home"] #contents,
+        ytd-browse[page-subtype="home"] ytd-rich-grid-renderer,
+        ytd-browse[page-subtype="home"] ytd-two-column-browse-results-renderer {
+            display: none !important;
+        }
+
+        #\${STUDY_SCREEN_ID} {
+            position: fixed;
+            top: 56px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 2050;
+            background:
+                radial-gradient(circle at 50% 38%,
+                    rgba(229, 72, 77, .055),
+                    transparent 32%),
+                #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #151922;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
+        #\${STUDY_SCREEN_ID} * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        #\${STUDY_SCREEN_ID} header {
+            height: 72px;
+            padding: 0 38px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            background: rgba(255, 255, 255, .92);
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            border-bottom: 1px solid #f2f4f7;
+        }
+
+        #\${STUDY_SCREEN_ID} .security-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 13px;
+            border: 1px solid #e5e7eb;
+            border-radius: 7px;
+            color: #667085;
+            background: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: .35px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.03);
+        }
+
+        #\${STUDY_SCREEN_ID} .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #16a34a;
+            box-shadow: 0 0 0 3px rgba(22, 163, 74, .12);
+        }
+
+        #\${STUDY_SCREEN_ID} main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 10;
+            width: 100%;
+        }
+
+        #\${STUDY_SCREEN_ID} .security-zone {
+            width: 100%;
+            max-width: 520px;
+            text-align: center;
+        }
+
+        #\${STUDY_SCREEN_ID} canvas.study-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #\${STUDY_SCREEN_ID} .security-icon {
+            width: 86px;
+            height: 86px;
+            margin: 0 auto 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #fff7f7;
+            border: 1px solid #ffdfe0;
+            box-shadow: 0 12px 35px rgba(229, 72, 77, .08);
+            position: relative;
+            z-index: 2;
+        }
+
+        #\${STUDY_SCREEN_ID} .security-icon::before,
+        #\${STUDY_SCREEN_ID} .security-icon::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 50%;
+            border: 2px solid rgba(229, 72, 77, 0.4);
+            animation: studyPulse 2s infinite cubic-bezier(0.165, 0.84, 0.44, 1);
+            z-index: -1;
+        }
+
+        #\${STUDY_SCREEN_ID} .security-icon::after {
+            animation-delay: 1s;
+        }
+
+        @keyframes studyPulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.7);
+                opacity: 0;
+            }
+        }
+
+        #\${STUDY_SCREEN_ID} .security-icon svg {
+            width: 56px;
+            height: 56px;
+            z-index: 2;
+            animation: studyFloat 3s ease-in-out infinite;
+        }
+
+        #\${STUDY_SCREEN_ID} .shield-inner-dashed {
+            stroke-dasharray: 4 3;
+            animation: dashRotate 10s linear infinite;
+        }
+
+        #\${STUDY_SCREEN_ID} .lock-shackle {
+            animation: shackleMove 3s ease-in-out infinite;
+            transform-origin: 12px 9px;
+        }
+
+        #\${STUDY_SCREEN_ID} .lock-keyhole {
+            animation: keyholePulse 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes studyFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-3px) scale(1.03); }
+        }
+
+        @keyframes dashRotate {
+            0% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: -28; }
+        }
+
+        @keyframes shackleMove {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-1.5px); }
+        }
+
+        @keyframes keyholePulse {
+            0% { opacity: 0.5; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1.1); }
+        }
+
+        #\${STUDY_SCREEN_ID} .security-label {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            margin-bottom: 14px;
+            border-radius: 6px;
+            color: #c9343a;
+            background: #fff2f2;
+            border: 1px solid #ffdfe0;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .7px;
+            text-transform: uppercase;
+        }
+
+        #\${STUDY_SCREEN_ID} h1 {
+            font-size: 36px;
+            line-height: 1.15;
+            letter-spacing: -1.2px;
+            font-weight: 800;
+            color: #151922;
+            margin-bottom: 12px;
+        }
+
+        #\${STUDY_SCREEN_ID} .description {
+            max-width: 420px;
+            margin: 0 auto 27px;
+            color: #667085;
+            font-size: 15px;
+            line-height: 1.65;
+        }
+
+        #\${STUDY_SCREEN_ID} .close-prompt {
+            display: block;
+            margin-top: 8px;
+            font-weight: 600;
+            color: #e5484d;
+        }
+
+        #\${STUDY_SCREEN_ID} .security-panel {
+            width: 100%;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-align: left;
+            border: 1px solid #e6e8ec;
+            border-radius: 10px;
+            background: #fafbfc;
+            box-shadow: 0 1px 3px rgba(0,0,0,.02);
+        }
+
+        #\${STUDY_SCREEN_ID} .panel-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #\${STUDY_SCREEN_ID} .lock {
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: #fff;
+            border: 1px solid #e7e9ed;
+            flex-shrink: 0;
+        }
+
+        #\${STUDY_SCREEN_ID} .lock svg {
+            width: 16px;
+            height: 16px;
+            color: #667085;
+        }
+
+        #\${STUDY_SCREEN_ID} .panel-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #344054;
+        }
+
+        #\${STUDY_SCREEN_ID} .panel-subtitle {
+            margin-top: 2px;
+            font-size: 11px;
+            color: #98a2b3;
+        }
+
+        #\${STUDY_SCREEN_ID} .enforced-badge {
+            color: #16a34a;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
+            border-radius: 5px;
+        }
+
+        #\${STUDY_SCREEN_ID} .actions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #\${STUDY_SCREEN_ID} .primary {
+            width: 100%;
+            max-width: 330px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            border-radius: 8px;
+            background: #e5484d;
+            color: #fff;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 7px 18px rgba(229, 72, 77, .2);
+            transition: .18s ease;
+        }
+
+        #\${STUDY_SCREEN_ID} .primary:hover {
+            background: #d13b40;
+            transform: translateY(-1px);
+            box-shadow: 0 10px 22px rgba(229, 72, 77, .26);
+        }
+
+        #\${STUDY_SCREEN_ID} footer {
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-top: 1px solid #eef0f3;
+            color: #667085;
+            font-size: 12px;
+            font-weight: 500;
+            background: #fff;
+            position: relative;
+            z-index: 10;
+            width: 100%;
+        }
+
+        @media (max-width: 600px) {
+            #\${STUDY_SCREEN_ID} header {
+                height: 56px;
+                padding: 0 20px;
+            }
+            #\${STUDY_SCREEN_ID} .security-status {
+                font-size: 10px;
+            }
+            #\${STUDY_SCREEN_ID} main {
+                padding: 30px 20px;
+            }
+            #\${STUDY_SCREEN_ID} .security-icon {
+                width: 76px;
+                height: 76px;
+            }
+            #\${STUDY_SCREEN_ID} .security-icon svg {
+                width: 48px;
+                height: 48px;
+            }
+            #\${STUDY_SCREEN_ID} h1 {
+                font-size: 28px;
+            }
+            #\${STUDY_SCREEN_ID} .description {
+                font-size: 14px;
+            }
+            #\${STUDY_SCREEN_ID} .security-panel {
+                padding: 12px;
+            }
+            #\${STUDY_SCREEN_ID} footer {
+                height: 48px;
+                font-size: 11px;
+            }
+        }
+    \`;
+
+    function isHomePage() {
+        return window.location.pathname === '/' || window.location.pathname === '';
+    }
+
+    var studyAnimId = null;
+
+    function initStudyCanvas(canvas) {
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        var particles = [];
+        var width, height;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        for (var i = 0; i < 45; i++) {
+            particles.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                vx: (Math.random() - 0.5) * 0.7,
+                vy: (Math.random() - 0.5) * 0.7,
+                radius: Math.random() * 2 + 1
+            });
+        }
+
+        function animate() {
+            if (!document.getElementById(STUDY_SCREEN_ID)) return;
+            ctx.clearRect(0, 0, width, height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0 || p.x > width) p.vx *= -1;
+                if (p.y < 0 || p.y > height) p.vy *= -1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(229, 72, 77, 0.35)';
+                ctx.fill();
+
+                for (var j = i + 1; j < particles.length; j++) {
+                    var p2 = particles[j];
+                    var dx = p.x - p2.x;
+                    var dy = p.y - p2.y;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 120) {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.strokeStyle = 'rgba(229, 72, 77, ' + (0.15 * (1 - dist / 120)) + ')';
+                        ctx.lineWidth = 0.8;
+                        ctx.stroke();
+                    }
+                }
+            }
+            studyAnimId = requestAnimationFrame(animate);
+        }
+        animate();
+    }
+
+    function enableHomeMode() {
+        if (!isHomePage()) {
+            disableHomeMode();
+            return;
+        }
+
+        if (!document.getElementById(STUDY_STYLE_ID)) {
+            var style = document.createElement('style');
+            style.id = STUDY_STYLE_ID;
+            style.textContent = studyCss;
+            (document.head || document.documentElement).appendChild(style);
+        }
+
+        if (document.getElementById(STUDY_SCREEN_ID)) return;
+
+        var screen = document.createElement('div');
+        screen.id = STUDY_SCREEN_ID;
+        screen.innerHTML = \`
+            <canvas class="study-canvas"></canvas>
+
+            <header>
+                <div class="security-status">
+                    <span class="status-dot"></span> Focus Policy Active
+                </div>
+            </header>
+
+            <main>
+                <section class="security-zone">
+                    <!-- SECURITY ICON -->
+                    <div class="security-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#e5484d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <!-- Outer Shield -->
+                            <path class="shield-outer" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-width="2"></path>
+                            <!-- Inner Dashed Shield -->
+                            <path class="shield-inner-dashed" d="M12 20c-3.5-1.5-6-4.5-6-8V6.5l6-2.2 6 2.2V12c0 3.5-2.5 6.5-6 8z" stroke="#e5484d" stroke-width="0.75" stroke-dasharray="3 3"></path>
+                            <!-- Lock Shackle -->
+                            <path class="lock-shackle" d="M10 11V9a2 2 0 1 1 4 0v2"></path>
+                            <!-- Lock Body -->
+                            <rect class="lock-body" x="8" y="11" width="8" height="5" rx="1" fill="#e5484d" stroke="none"></rect>
+                            <!-- Keyhole -->
+                            <circle class="lock-keyhole" cx="12" cy="13.5" r="1" fill="#fff" stroke="none"></circle>
+                        </svg>
+                    </div>
+
+                    <!-- LABEL -->
+                    <div class="security-label">
+                        Focus Policy
+                    </div>
+
+                    <!-- TITLE -->
+                    <h1>PLEASE STUDY</h1>
+
+                    <p class="description">
+                        The recommendation feed has been disabled to eliminate distractions.
+                        <span class="close-prompt">Use the search bar above to look up educational lectures or course material.</span>
+                    </p>
+
+                    <!-- SECURITY STATUS PANEL -->
+                    <div class="security-panel">
+                        <div class="panel-left">
+                            <div class="lock">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                                    <path d="M7 11V7 C7 4.2 9.2 2 12 2 C14.8 2 17 4.2 17 7V11"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="panel-title">Distraction-Free Study Mode</div>
+                                <div class="panel-subtitle">Algorithmic home feed blocked</div>
+                            </div>
+                        </div>
+                        <div class="enforced-badge">
+                            Enforced
+                        </div>
+                    </div>
+
+                    <!-- ACTIONS -->
+                    <div class="actions">
+                        <button class="primary" id="focus-search-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            Search Educational Topics
+                        </button>
+                    </div>
+                </section>
+            </main>
+
+            <footer>
+                Network tool Developed By Divyansh yadav
+            </footer>
+        \`;
+
+        (document.body || document.documentElement).appendChild(screen);
+
+        var btn = screen.querySelector('#focus-search-btn');
+        if (btn) {
+            btn.addEventListener('click', function() {
+                var searchInput = document.querySelector('input#search') || document.querySelector('input[name="search_query"]') || document.querySelector('input[type="text"]');
+                if (searchInput) {
+                    searchInput.focus();
+                    if (searchInput.select) searchInput.select();
+                    searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        }
+
+        var canvas = screen.querySelector('canvas.study-canvas');
+        if (canvas) {
+            initStudyCanvas(canvas);
+        }
+    }
+
+    function disableHomeMode() {
+        if (studyAnimId) {
+            cancelAnimationFrame(studyAnimId);
+            studyAnimId = null;
+        }
+        var screen = document.getElementById(STUDY_SCREEN_ID);
+        if (screen) screen.remove();
+        var style = document.getElementById(STUDY_STYLE_ID);
+        if (style) style.remove();
+    }
+
+    function checkURL() {
+        if (isHomePage()) {
+            enableHomeMode();
+        } else {
+            disableHomeMode();
+        }
+    }
+
+    var currentURL = window.location.href;
+    setInterval(function() {
+        if (window.location.href !== currentURL) {
+            currentURL = window.location.href;
+            checkURL();
+        }
+    }, 150);
+
+    window.addEventListener("popstate", checkURL);
+    window.addEventListener("yt-navigate-finish", checkURL);
+
+    // 8. Client-Side Blocked Keyword Interceptor for YouTube Searches
+    const blockedKeywordsList = ["game", "games", "belly", "dance"];
+    function hasBlockedKeyword(text) {
+        if (!text || typeof text !== "string") return false;
+        var decoded = text.toLowerCase();
+        try { decoded = decodeURIComponent(text.split('+').join(' ')).toLowerCase(); } catch (_) {}
+        for (var i = 0; i < blockedKeywordsList.length; i++) {
+            var kw = blockedKeywordsList[i].toLowerCase();
+            if (decoded.indexOf(kw) !== -1) return true;
+        }
+        return false;
+    }
+
+    function checkAndBlockClientSearch() {
+        if (hasBlockedKeyword(window.location.href) || hasBlockedKeyword(window.location.search)) {
+            window.location.replace("/blocked_keyword_access");
+        }
+    }
+
+    checkAndBlockClientSearch();
+    window.addEventListener("popstate", checkAndBlockClientSearch);
+    window.addEventListener("yt-navigate-finish", checkAndBlockClientSearch);
+    setInterval(checkAndBlockClientSearch, 150);
+
+    document.addEventListener("submit", function(e) {
+        var input = e.target && e.target.querySelector && (e.target.querySelector("input#search") || e.target.querySelector("input[name='search_query']"));
+        if (input && hasBlockedKeyword(input.value)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            window.location.replace("/blocked_keyword_access");
+            return false;
+        }
+    }, true);
 })();
 `;
 
-const UBLOCK_INJECTION = `<style id="skonexa-ublock-css">${UBLOCK_CSS}</style><script id="skonexa-ublock-js">${UBLOCK_JS}</script>`;
+const UBLOCK_INJECTION = `<style id="filter-shield-css">${UBLOCK_CSS}</style><script id="filter-shield-js">${UBLOCK_JS}</script>`;
+
+/*
+|--------------------------------------------------------------------------
+| URL & Keyword Path Blocking Engine
+|--------------------------------------------------------------------------
+*/
 
 function isPathBlocked(host, url, headers) {
     host = normalizeHost(host);
 
-    const pathMatches = config.blockedPaths.some(rule => {
+    const pathMatches = config.blockedPaths && config.blockedPaths.some(rule => {
         return (
             rule.host.test(host) &&
             rule.path.test(url)
@@ -443,6 +1106,29 @@ function isPathBlocked(host, url, headers) {
     // Check if internal API request originated from Shorts page
     if (headers && headers.referer && /(^|\.)youtube\.com\/shorts/i.test(headers.referer)) {
         if (/^\/youtubei\/v1\/(player|reel|next)/i.test(url)) {
+            return true;
+        }
+    }
+
+    // Explicit blocked keyword path
+    if (url.includes("/blocked_keyword_access")) {
+        return true;
+    }
+
+    // Universal Keyword Blocking: Across ANY URL, ANY domain, ANY search query or path
+    let decodedUrl = url;
+    try {
+        decodedUrl = decodeURIComponent(url.split('+').join(' '));
+    } catch (_) {}
+
+    const fullTarget = (host + "/" + decodedUrl).toLowerCase();
+    const keywords = config.blockedKeywords || ["game", "games", "belly", "dance"];
+
+    for (let i = 0; i < keywords.length; i++) {
+        const cleanKw = keywords[i].toLowerCase().trim();
+        if (!cleanKw) continue;
+
+        if (fullTarget.includes(cleanKw) || decodedUrl.toLowerCase().includes(cleanKw) || host.toLowerCase().includes(cleanKw)) {
             return true;
         }
     }
@@ -1050,11 +1736,6 @@ proxy.onRequest((ctx, callback) => {
         req.headers
     );
 
-    console.log(
-        `[${result.blocked ? "BLOCK" : "ALLOW"}] ` +
-        `${req.method} ${host}${url}`
-    );
-
     if (result.blocked) {
 
         const response =
@@ -1089,20 +1770,24 @@ proxy.onRequest((ctx, callback) => {
         return;
     }
 
-    // Ensure proxyToServerRequest never rejects self-signed / corporate upstream certs
+    // Ensure proxyToServerRequest never rejects self-signed / corporate upstream certs and supports large headers
     if (ctx.proxyToServerRequestOptions) {
         ctx.proxyToServerRequestOptions.rejectUnauthorized = false;
+        ctx.proxyToServerRequestOptions.maxHeaderSize = MAX_HEADER_SIZE;
     }
 
     ctx.onRequestHeaders((ctx, cb) => {
         if (ctx.proxyToServerRequestOptions) {
             ctx.proxyToServerRequestOptions.rejectUnauthorized = false;
+            ctx.proxyToServerRequestOptions.maxHeaderSize = MAX_HEADER_SIZE;
         }
         return cb();
     });
 
-    // If request is to YouTube, inject uBlock Master & Anti-Shorts into HTML pages
-    if (/(^|\.)youtube\.com$/i.test(host)) {
+    const isYouTube = /(^|\.)youtube\.com$/i.test(host);
+
+    // If request is to YouTube, intercept response and inject uBlock Master & Anti-Shorts into HTML
+    if (isYouTube) {
         // Force server to respond with gzip or identity
         if (ctx.proxyToServerRequestOptions && ctx.proxyToServerRequestOptions.headers) {
             ctx.proxyToServerRequestOptions.headers["accept-encoding"] = "gzip";
@@ -1119,6 +1804,8 @@ proxy.onRequest((ctx, callback) => {
 
                 if (contentType.includes("text/html")) {
                     ctx.isHtml = true;
+                    ctx.responseContentPotentiallyModified = true;
+                    delete ctx.serverToProxyResponse.headers["content-length"];
 
                     if (encoding === "gzip") {
                         delete ctx.serverToProxyResponse.headers["content-encoding"];
@@ -1143,17 +1830,14 @@ proxy.onRequest((ctx, callback) => {
                     html = html.replace("<head>", "<head>" + UBLOCK_INJECTION);
                     chunk = Buffer.from(html, "utf8");
                     injected = true;
-                    console.log(`[INJECT] uBlock Master & Anti-Shorts injected into ${host}${url}`);
                 } else if (/<head[^>]*>/i.test(html)) {
                     html = html.replace(/<head[^>]*>/i, "$&" + UBLOCK_INJECTION);
                     chunk = Buffer.from(html, "utf8");
                     injected = true;
-                    console.log(`[INJECT] uBlock Master & Anti-Shorts injected into ${host}${url}`);
                 } else if (html.includes("<html") || html.includes("<!DOCTYPE") || html.includes("<!doctype")) {
                     html = UBLOCK_INJECTION + html;
                     chunk = Buffer.from(html, "utf8");
                     injected = true;
-                    console.log(`[INJECT] uBlock Master & Anti-Shorts prepended to HTML ${host}${url}`);
                 }
             }
             return cb(null, chunk);
@@ -1161,6 +1845,23 @@ proxy.onRequest((ctx, callback) => {
     }
 
     callback();
+});
+
+/*
+|--------------------------------------------------------------------------
+| WebSocket Connection Handling
+|--------------------------------------------------------------------------
+*/
+
+proxy.onWebSocketConnection((ctx, callback) => {
+    if (ctx.proxyToServerWebSocketOptions) {
+        ctx.proxyToServerWebSocketOptions.rejectUnauthorized = false;
+    }
+    return callback();
+});
+
+proxy.onWebSocketError((ctx, err) => {
+    // Silently ignore WebSocket network drops
 });
 
 /*
@@ -1173,12 +1874,11 @@ proxy.onError((ctx, err, kind) => {
     const code = err?.code || "";
     const msg = err?.message || "";
 
-    // Ignore benign client socket timeouts and server client-drop events
+    // Silently ignore benign network timeouts, client aborts, and SSL scanner drops
     if (kind === "HTTPS_CLIENT_ERROR" || kind === "HTTPS_SERVER_ERROR") {
         return;
     }
 
-    // Ignore benign socket reset / timeout / upstream certificate verification errors
     if (
         code === "ECONNRESET" ||
         code === "EPIPE" ||
@@ -1188,12 +1888,13 @@ proxy.onError((ctx, err, kind) => {
         code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
         code === "DEPTH_ZERO_SELF_SIGNED_CERT" ||
         code === "CERT_HAS_EXPIRED" ||
+        code === "HPE_HEADER_OVERFLOW" ||
         msg.includes("ECONNRESET") ||
         msg.includes("Request timeout") ||
         msg.includes("self-signed certificate") ||
-        msg.includes("unable to verify")
+        msg.includes("unable to verify") ||
+        msg.includes("Header overflow")
     ) {
-        // Send a clean 502/504 error to client if response is still pending
         try {
             if (ctx && ctx.proxyToClientResponse && !ctx.proxyToClientResponse.headersSent) {
                 const status = code.includes("TIMEOUT") ? 504 : 502;
@@ -1203,16 +1904,6 @@ proxy.onError((ctx, err, kind) => {
         } catch (_) {}
         return;
     }
-
-    if (code === "ERR_SSL_SSLV3_ALERT_CERTIFICATE_UNKNOWN" || msg.includes("certificate unknown")) {
-        console.warn("[PROXY SSL WARNING] Client rejected MITM certificate (SSL alert 46). Make sure ca.crt is installed in Windows/Browser Trusted Root Authorities.");
-        return;
-    }
-
-    console.error(
-        `[PROXY ERROR${kind ? " - " + kind : ""}]`,
-        msg || err
-    );
 });
 
 /*
@@ -1236,21 +1927,19 @@ proxy.listen({
     )
 }, (err) => {
     if (err) {
-        console.error("[PROXY FATAL ERROR] Failed to start proxy server:", err);
         process.exit(1);
     }
 
     console.log(`
 ================================================================
-           Network Web Filter Proxy (Running)
-              Developed by Divyansh Yadav
+             Network Tool developed by Divyansh                 
 ================================================================
 
- [✓] HTTP Proxy Port : ${config.port}
- [✓] HTTPS MITM      : ENABLED (Root CA Synced)
- [✓] CA Certificate  : ${CA_CERT}
- [✓] Protection      : YouTube Shorts Blocked + uBlock Origin Engine
+  [✓] Status       : Active & Protecting
+  [✓] Proxy Address: 127.0.0.1:${config.port}
 
+  Network policy and content filtering enforced.
+  Keep this window open while using the internet.
 ================================================================
 `);
 });

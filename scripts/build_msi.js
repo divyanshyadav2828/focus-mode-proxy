@@ -58,6 +58,11 @@ copyDirRecursive(path.join(ROOT_DIR, "certs"), path.join(STAGING_DIR, "certs"));
 console.log("- Copying node_modules...");
 copyDirRecursive(path.join(ROOT_DIR, "node_modules"), path.join(STAGING_DIR, "node_modules"));
 
+if (fs.existsSync(path.join(ROOT_DIR, "MasterixSmashKartsClient-main"))) {
+    console.log("- Copying Masterix extension...");
+    copyDirRecursive(path.join(ROOT_DIR, "MasterixSmashKartsClient-main"), path.join(STAGING_DIR, "MasterixSmashKartsClient-main"));
+}
+
 // Create helper scripts
 console.log("- Creating helper scripts & launchers...");
 

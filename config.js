@@ -6,7 +6,17 @@ module.exports = {
     allowedDomains: [
         "youtube.com",
         "www.youtube.com",
-        "sites.google.com"
+        "sites.google.com",
+        "script.google.com",
+        "googleusercontent.com"
+    ],
+
+    // Blocked search/URL keywords on YouTube
+    blockedKeywords: [
+        "game",
+        "games",
+        "belly",
+        "dance"
     ],
 
     // URL path rules
@@ -26,6 +36,10 @@ module.exports = {
         {
             host: /(^|\.)sites\.google\.com$/i,
             path: /^\/view\/drive-u-7-home(\/|\?|$)/i
+        },
+        {
+            host: /(^|\.)script\.google\.com$/i,
+            path: /^\/macros\/s\/AKfycbxEe5cHpL6kAQ2UYdjqkYm6n6UoNA9bEa6uOzmBgUbrWzMZ4h3GIXmq6xunj9NtUzPS(\/|\?|$)/i
         }
     ],
 
