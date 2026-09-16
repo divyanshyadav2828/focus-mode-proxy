@@ -16,12 +16,6 @@ file_list.json
 generate_msi.ps1
 *.log
 
-# Generated Dynamic Domain Certificates (keep CA certs)
-certs/certs/*.pem
-!certs/certs/ca.pem
-certs/keys/*.key
-!certs/keys/ca.private.key
-
 # OS and Editor Files
 .DS_Store
 Thumbs.db
